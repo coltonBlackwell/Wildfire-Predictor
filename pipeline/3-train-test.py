@@ -7,8 +7,11 @@ from sklearn.metrics import mean_squared_error, r2_score
 from xgboost import XGBRegressor
 import matplotlib.pyplot as plt
 import seaborn as sns
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
+import folium
+from folium import Map, Marker, Circle
+import requests
+import random
+
 
 # Load and preprocess the dataset
 df = pd.read_csv('../data/wildfires_preprocessed.csv')  # Adjust path as needed
@@ -150,57 +153,77 @@ print(f"Actual SIZE_HA: {actual:.2f}")
 
 # ======= END OF NEW SECTION =======
 
-# import numpy as np
-# import pandas as pd
-# import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
+# --- Select 40 random test samples ---
+sample_count = 1000
+sample_idxs = random.sample(range(len(X_test)), sample_count)  # Randomly select 40 indices from X_test
 
-# --- Select a test sample ---
-sample_idx = 0  # Change this to explore different fires
-sample = X_test.iloc[sample_idx:sample_idx+1]
+# Initialize map centered on BC
+m = folium.Map(
+    location=[53.5, -125],  # Center of BC
+    zoom_start=5.8,  # Wide enough to show the whole province
+    tiles='Esri.WorldImagery'
+)
 
-# Get predicted size
-if y_class_pred[sample_idx] == 0:
-    sample_pred_log = small_regressor.predict(sample)
-else:
-    sample_pred_log = large_regressor.predict(sample)
+# Loop through each random sample
+for sample_idx in sample_idxs:
+    sample = X_test.iloc[sample_idx:sample_idx+1]  # Select the current sample
 
-sample_pred = np.expm1(sample_pred_log)[0]  # Predicted SIZE_HA (hectares)
-actual = np.expm1(y_reg_test.iloc[sample_idx])  # Actual SIZE_HA
+    # Get predicted size
+    if y_class_pred[sample_idx] == 0:
+        sample_pred_log = small_regressor.predict(sample)
+    else:
+        sample_pred_log = large_regressor.predict(sample)
 
-# --- Reverse scaling for coordinates ---
-lat = sample['LATITUDE'].values[0] * scaler.scale_[0] + scaler.mean_[0]
-lon = sample['LONGITUDE'].values[0] * scaler.scale_[1] + scaler.mean_[1]
+    sample_pred = np.expm1(sample_pred_log)[0]  # Predicted SIZE_HA
+    actual = np.expm1(y_reg_test.iloc[sample_idx])  # Actual SIZE_HA from y_reg_test
 
-# --- Calculate radius in degrees ---
-# Approximate conversion: 1° latitude ≈ 111 km, 1 ha = 0.01 km²
-pred_radius_km = np.sqrt(sample_pred * 0.01 / np.pi)  # Radius in km
-pred_radius_deg = pred_radius_km / 111  # Convert km to degrees
+    # Reverse scaling for coordinates
+    lat = sample['LATITUDE'].values[0] * scaler.scale_[0] + scaler.mean_[0]
+    lon = sample['LONGITUDE'].values[0] * scaler.scale_[1] + scaler.mean_[1]
 
-# --- Set up the map ---
-fig, ax = plt.subplots(figsize=(12, 8))
-m = Basemap(projection='merc',
-            llcrnrlat=48, urcrnrlat=60,
-            llcrnrlon=-140, urcrnrlon=-113,
-            resolution='i', ax=ax)
+    # Calculate predicted radius in meters
+    pred_radius_km = np.sqrt(sample_pred * 0.01 / np.pi)  # ha to km
+    pred_radius_m = pred_radius_km * 1000  # to meters
 
-# Add map features
-m.drawcoastlines()
-m.drawcountries()
-m.drawstates()
+    # Calculate actual radius in meters
+    actual_radius_km = np.sqrt(actual * 0.01 / np.pi)  # ha to km
+    actual_radius_m = actual_radius_km * 1000  # to meters
 
+    # Data to display in the popup for each sample
+    data_info = f"""
+    <b>Cause (Human):</b> {sample['CAUSE_H'].values[0]}<br>
+    <b>Cause (Lightning):</b> {sample['CAUSE_L'].values[0]}<br>
+    <b>Cause (Unknown):</b> {sample['CAUSE_U'].values[0]}<br>
+    <b>Boreal Cordillera:</b> {sample['ECOZ_Boreal Cordillera'].values[0]}<br>
+    <b>Boreal Plain:</b> {sample['ECOZ_Boreal PLain'].values[0]}<br>
+    <b>Montane Cordillera:</b> {sample['ECOZ_Montane Cordillera'].values[0]}<br>
+    <b>Pacific Maritime:</b> {sample['ECOZ_Pacific Maritime'].values[0]}<br>
+    <b>Prairie:</b> {sample['ECOZ_Prairie'].values[0]}<br>
+    <b>Taiga Plain:</b> {sample['ECOZ_Taiga Plain'].values[0]}<br>
+    """
 
-# --- Plot the fire ---
-# Fire origin (red dot)
-x, y = m(lon, lat)
-m.scatter(x, y, color='red', s=50, label='Fire Origin')
+    # Add a marker for the fire origin
+    Marker([lat, lon], popup=folium.Popup(data_info, max_width=400)).add_to(m)
 
-# Predicted fire radius (orange circle)
-circle = plt.Circle((x, y), pred_radius_km * 1000, color='red', alpha=0.3, label=f'Predicted: {sample_pred:.1f} ha')
-ax.add_patch(circle)
+    # Add predicted radius as a red translucent circle
+    Circle(
+        location=[lat, lon],
+        radius=pred_radius_m,
+        color='red',
+        fill=True,
+        fill_opacity=0.3,
+        popup=f'Predicted: {sample_pred:.1f} ha'
+    ).add_to(m)
 
-# --- Add title and legend ---
-plt.title(f'Wildfire Size Prediction at ({lat:.2f}°N, {lon:.2f}°W)', pad=20)
-plt.legend(loc='upper right')
+    # Add actual radius as a blue translucent circle
+    Circle(
+        location=[lat, lon],
+        radius=actual_radius_m,
+        color='blue',
+        fill=True,
+        fill_opacity=0.3,
+        popup=f'Actual: {actual:.1f} ha'
+    ).add_to(m)
 
-plt.show()
+# Save or display the map
+m.save('wildfire_prediction_map.html')
