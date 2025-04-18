@@ -27,7 +27,7 @@ def preprocess_wildfire_data(input_csv='../data/CANADA_WILDFIRES.csv', output_cs
 
     # Remove extreme or invalid fire sizes
     df = df[df['SIZE_HA'] > 0]              # Remove 0 or negative sizes
-    df['SIZE_HA'] = df['SIZE_HA'].clip(upper=10000)  # Cap extremely large values
+    df['SIZE_HA'] = df['SIZE_HA'].clip(upper=5000)  # Cap extremely large values
 
     # Round SIZE_HA to the nearest 0.001
     df['SIZE_HA'] = df['SIZE_HA'].round(3)

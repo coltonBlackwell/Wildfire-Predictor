@@ -1,28 +1,29 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import HistGradientBoostingRegressor, VotingRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor, HistGradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
+from xgboost import XGBRegressor
 import matplotlib.pyplot as plt
 import seaborn as sns
-from xgboost import XGBRegressor
 
-# Load the dataset
-df = pd.read_csv('../data/wildfires_preprocessed.csv')  # Replace with actual path
+# Load and preprocess the dataset
+df = pd.read_csv('../data/wildfires_preprocessed.csv')  # Adjust path as needed
+df = df[df['SIZE_HA'] < df['SIZE_HA'].quantile(0.9)]  # Remove top 1% outliers
 
-# Filter the data
-df = df[df['SIZE_HA'] < df['SIZE_HA'].quantile(0.99)]
+# Binary label for classification (small ≤ 1 ha, large > 1 ha)
+df['IS_LARGE'] = (df['SIZE_HA'] > 1).astype(int)
 
-# Target variable (log-transform to handle skew)
-y = np.log1p(df['SIZE_HA'])
+# Log-transform target for regression
+df['LOG_SIZE'] = np.log1p(df['SIZE_HA'])
 
 # Feature engineering
 df['LAT_LONG'] = df['LATITUDE'] * df['LONGITUDE']
 df['SEASON'] = pd.cut(df['MONTH'], bins=[0, 3, 6, 9, 12], labels=['Winter', 'Spring', 'Summer', 'Fall'])
 df = pd.get_dummies(df, columns=['SEASON'], drop_first=True)
 
-# Features for model
+# Feature columns
 feature_cols = [
     'LATITUDE', 'LONGITUDE', 'YEAR', 'MONTH', 'DAY', 'DAYOFYEAR', 'LAT_LONG',
     'CAUSE_H', 'CAUSE_L', 'CAUSE_U',
@@ -31,28 +32,30 @@ feature_cols = [
     'SEASON_Spring', 'SEASON_Summer', 'SEASON_Fall'
 ]
 X = df[feature_cols].copy()
+y_class = df['IS_LARGE']
+y_reg = df['LOG_SIZE']
 
-# Normalize numeric columns
+# Normalize numeric features
 numeric_cols = ['LATITUDE', 'LONGITUDE', 'YEAR', 'MONTH', 'DAY', 'DAYOFYEAR', 'LAT_LONG']
 scaler = StandardScaler()
 X[numeric_cols] = scaler.fit_transform(X[numeric_cols])
 
-# Train-test split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# Define models
-hist_model = HistGradientBoostingRegressor(
-    max_iter=300,
-    learning_rate=0.05,
-    max_leaf_nodes=31,
-    max_depth=10,
-    min_samples_leaf=20,
-    l2_regularization=1.0,
-    early_stopping=True,
-    random_state=42
+# Split the data
+X_train, X_test, y_class_train, y_class_test, y_reg_train, y_reg_test = train_test_split(
+    X, y_class, y_reg, test_size=0.2, random_state=42
 )
 
-xgb_model = XGBRegressor(
+# Train classifier
+classifier = HistGradientBoostingClassifier(random_state=42)
+classifier.fit(X_train, y_class_train)
+
+# Split training data into small and large for regression
+small_idx_train = y_class_train == 0
+large_idx_train = y_class_train == 1
+
+# Define regressors
+small_regressor = HistGradientBoostingRegressor(random_state=42)
+large_regressor = XGBRegressor(
     n_estimators=300,
     learning_rate=0.05,
     max_depth=10,
@@ -62,24 +65,33 @@ xgb_model = XGBRegressor(
     verbosity=0
 )
 
-# Ensemble model
-ensemble = VotingRegressor(estimators=[
-    ('histgb', hist_model),
-    ('xgb', xgb_model)
-])
+# Train regressors on respective subsets
+small_regressor.fit(X_train[small_idx_train], y_reg_train[small_idx_train])
+large_regressor.fit(X_train[large_idx_train], y_reg_train[large_idx_train])
 
-# Train the model
-ensemble.fit(X_train, y_train)
+# Classify test set
+y_class_pred = classifier.predict(X_test)
 
-# Make predictions
-y_pred_log = ensemble.predict(X_test)
+# Allocate predictions based on classification
+y_pred_log = np.zeros_like(y_reg_test)
+
+# Small fire predictions
+small_idx_test = y_class_pred == 0
+y_pred_log[small_idx_test] = small_regressor.predict(X_test[small_idx_test])
+
+# Large fire predictions
+large_idx_test = y_class_pred == 1
+y_pred_log[large_idx_test] = large_regressor.predict(X_test[large_idx_test])
+
+# Convert back to real SIZE_HA
 y_pred = np.expm1(y_pred_log)
-y_test_actual = np.expm1(y_test)
+y_test_actual = np.expm1(y_reg_test)
 
-# Evaluation metrics
+# Evaluate
 mse = mean_squared_error(y_test_actual, y_pred)
 r2 = r2_score(y_test_actual, y_pred)
 
+print(f"\n📊 Stratified Model Performance:")
 print(f"Test MSE: {mse:.2f}")
 print(f"Test R^2: {r2:.2f}")
 
@@ -103,8 +115,7 @@ plt.show()
 
 # Visualization 3: Feature Importance Plot (from XGBoost model)
 plt.figure(figsize=(10, 6))
-xgb_model.fit(X_train, y_train)  # Fit XGBoost model separately for feature importance
-xgb_importance = xgb_model.feature_importances_
+xgb_importance = large_regressor.feature_importances_  # Use XGBoost model
 feature_names = X.columns
 
 # Sort the feature importances
@@ -113,7 +124,24 @@ sorted_importances = xgb_importance[sorted_idx]
 sorted_feature_names = feature_names[sorted_idx]
 
 plt.barh(sorted_feature_names, sorted_importances, color='lightcoral')
-plt.title('Feature Importance from XGBoost')
+plt.title('Feature Importance from XGBoost (Large Fires Model)')  # Updated title
 plt.xlabel('Feature Importance')
 plt.ylabel('Features')
 plt.show()
+
+# ======= NEW SECTION: Inspect one prediction =======
+
+# Pick a test sample (first row)
+sample = X_test.iloc[0:1]
+sample_pred_log = small_regressor.predict(sample)
+sample_pred = np.expm1(sample_pred_log)
+
+# Actual value
+actual_log = y_pred_log[small_idx_test][0]
+actual = np.expm1(actual_log)
+
+print("\n--- Single Prediction Example ---")
+print(f"Predicted log(SIZE_HA): {sample_pred_log[0]:.4f}")
+print(f"Predicted SIZE_HA: {sample_pred[0]:.2f}")
+print(f"Actual log(SIZE_HA): {actual_log:.4f}")
+print(f"Actual SIZE_HA: {actual:.2f}")
