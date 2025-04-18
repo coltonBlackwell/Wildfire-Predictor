@@ -1,6 +1,6 @@
 import numpy as np
-import folium
-from folium import Marker, Circle, FeatureGroup, LayerControl, Element, Html
+# import folium
+from folium import Marker, Circle, FeatureGroup, LayerControl, Map, Popup, GeoJson
 import joblib
 import random
 import json
@@ -27,7 +27,7 @@ print(f"Actual SIZE_HA: {actual:.2f}")
 sample_count = 1000
 sample_idxs = random.sample(range(len(X_test)), sample_count)
 
-m = folium.Map(location=[53.5, -125], zoom_start=5.8, tiles='Esri.WorldImagery')
+m = Map(location=[53.5, -125], zoom_start=5.8, tiles='Esri.WorldImagery')
 
 # Feature groups
 predicted_layer = FeatureGroup(name="Predicted Radius")
@@ -57,7 +57,7 @@ for sample_idx in sample_idxs:
     <b>Taiga Plain:</b> {sample['ECOZ_Taiga Plain'].values[0]}<br>
     """
 
-    Marker([lat, lon], popup=folium.Popup(data_info, max_width=400)).add_to(m)
+    Marker([lat, lon], popup=Popup(data_info, max_width=400)).add_to(m)
 
     # Add predicted radius (always visible)
     Circle([lat, lon], radius=pred_radius_m, color='red', fill=True,
@@ -77,7 +77,7 @@ fields = list(geojson_data['features'][0]['properties'].keys())
 
 
 # Add GeoJson layer with all fields
-folium.GeoJson(
+GeoJson(
     geojson_data,
     name="Provinces",
     style_function=lambda feature: {
