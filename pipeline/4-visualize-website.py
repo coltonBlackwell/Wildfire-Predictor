@@ -1,6 +1,6 @@
 import numpy as np
 import folium
-from folium import Marker, Circle, FeatureGroup, LayerControl, Element
+from folium import Marker, Circle, FeatureGroup, LayerControl, Element, Html
 import joblib
 import random
 import json
@@ -74,6 +74,8 @@ with open("georef-canada-province@public.geojson", "r", encoding="utf-8") as f:
 # Get all property fields dynamically
 fields = list(geojson_data['features'][0]['properties'].keys())
 
+
+
 # Add GeoJson layer with all fields
 folium.GeoJson(
     geojson_data,
@@ -83,35 +85,14 @@ folium.GeoJson(
         'color': 'yellow',         # change for visibility
         'weight': 2,
     }
-    # tooltip=folium.GeoJsonTooltip(fields=["prov_name_en"], aliases=["Province:"])
 ).add_to(m)
-
 
 # Add feature groups to map
 predicted_layer.add_to(m)
 actual_layer.add_to(m)
+
+# Add LayerControl (to toggle layers)
 LayerControl().add_to(m)
-
-
-
-# Add a responsive title at the top of the map
-title_html = '''
-    <div style="position: fixed; top: 10px; width: 100%; text-align: center; z-index: 9999;">
-        <h2 style="background-color: rgba(255, 255, 255, 0.8); 
-                   display: inline-block; 
-                   padding: 10px 20px; 
-                   border-radius: 10px; 
-                   font-size: 2vw; 
-                   font-family: Arial, sans-serif;
-                   box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
-            Wildfire Prediction Map
-        </h2>
-    </div>
-'''
-
-m.get_root().html.add_child(Element(title_html))
-
-
 
 # Save map
 m.save('wildfire_prediction_map.html')
