@@ -7,6 +7,8 @@ from sklearn.metrics import mean_squared_error, r2_score
 from xgboost import XGBRegressor
 import matplotlib.pyplot as plt
 import seaborn as sns
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 # Load and preprocess the dataset
 df = pd.read_csv('../data/wildfires_preprocessed.csv')  # Adjust path as needed
@@ -145,3 +147,60 @@ print(f"Predicted log(SIZE_HA): {sample_pred_log[0]:.4f}")
 print(f"Predicted SIZE_HA: {sample_pred[0]:.2f}")
 print(f"Actual log(SIZE_HA): {actual_log:.4f}")
 print(f"Actual SIZE_HA: {actual:.2f}")
+
+# ======= END OF NEW SECTION =======
+
+# import numpy as np
+# import pandas as pd
+# import matplotlib.pyplot as plt
+from mpl_toolkits.basemap import Basemap
+
+# --- Select a test sample ---
+sample_idx = 0  # Change this to explore different fires
+sample = X_test.iloc[sample_idx:sample_idx+1]
+
+# Get predicted size
+if y_class_pred[sample_idx] == 0:
+    sample_pred_log = small_regressor.predict(sample)
+else:
+    sample_pred_log = large_regressor.predict(sample)
+
+sample_pred = np.expm1(sample_pred_log)[0]  # Predicted SIZE_HA (hectares)
+actual = np.expm1(y_reg_test.iloc[sample_idx])  # Actual SIZE_HA
+
+# --- Reverse scaling for coordinates ---
+lat = sample['LATITUDE'].values[0] * scaler.scale_[0] + scaler.mean_[0]
+lon = sample['LONGITUDE'].values[0] * scaler.scale_[1] + scaler.mean_[1]
+
+# --- Calculate radius in degrees ---
+# Approximate conversion: 1° latitude ≈ 111 km, 1 ha = 0.01 km²
+pred_radius_km = np.sqrt(sample_pred * 0.01 / np.pi)  # Radius in km
+pred_radius_deg = pred_radius_km / 111  # Convert km to degrees
+
+# --- Set up the map ---
+fig, ax = plt.subplots(figsize=(12, 8))
+m = Basemap(projection='merc',
+            llcrnrlat=48, urcrnrlat=60,
+            llcrnrlon=-140, urcrnrlon=-113,
+            resolution='i', ax=ax)
+
+# Add map features
+m.drawcoastlines()
+m.drawcountries()
+m.drawstates()
+
+
+# --- Plot the fire ---
+# Fire origin (red dot)
+x, y = m(lon, lat)
+m.scatter(x, y, color='red', s=50, label='Fire Origin')
+
+# Predicted fire radius (orange circle)
+circle = plt.Circle((x, y), pred_radius_km * 1000, color='red', alpha=0.3, label=f'Predicted: {sample_pred:.1f} ha')
+ax.add_patch(circle)
+
+# --- Add title and legend ---
+plt.title(f'Wildfire Size Prediction at ({lat:.2f}°N, {lon:.2f}°W)', pad=20)
+plt.legend(loc='upper right')
+
+plt.show()
