@@ -1,6 +1,6 @@
 # 🔥 BC Wildfire Predictor 🔥
 
-Wildfire Predictor is a Python project designed to analyze wildfire data, preprocess inputs, train predictive models, and visualize wildfire occurrences. This guide covers all the essential information you need to get started with the project.
+Wildfire Predictor is a Python project designed to analyze wildfire data in British Columbia, preprocess inputs, train predictive models, and visualize wildfire occurrences. This README covers the essential information you need to get started with the project.
 
 ## Installation
 
@@ -30,7 +30,25 @@ The data required for the project is located in the [data](https://github.com/co
 
 ## Documentation
 
-For detailed information about the dataset and its usage, refer to the [dataset_gude.md](https://github.com/coltonBlackwell/Wildfire-Predictor/blob/main/docs/dataset_quide.md) file
+For detailed information about the dataset and its usage, refer to the [dataset_guide.md](https://github.com/coltonBlackwell/Wildfire-Predictor/blob/main/docs/dataset_quide.md) file
 
+## Testing
+
+Unit tests are provided in the [tests](https://github.com/coltonBlackwell/Wildfire-Predictor/tree/main/tests) directory.
+
+run all tests using: 
+
+```sh
+   pytest
+```
+or test modules specifically using: 
+
+```sh
+   pytest [test_filename.py]
+```
+
+## License
+
+This project is licensed under the terms of the [LICENSE](https://github.com/coltonBlackwell/Wildfire-Predictor/blob/main/LICENSE) file.
 
 
