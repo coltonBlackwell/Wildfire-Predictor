@@ -9,9 +9,10 @@ import joblib
 
 
 def train(input_csv):
+    """Train a model to predict wildfire size and classify large wildfires."""
 
-    # Load and preprocess the dataset
     df = pd.read_csv(input_csv)
+
     df = df[df['SIZE_HA'] < df['SIZE_HA'].quantile(0.9)]
     df['IS_LARGE'] = (df['SIZE_HA'] > 1).astype(int)
     df['LOG_SIZE'] = np.log1p(df['SIZE_HA'])

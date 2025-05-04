@@ -5,6 +5,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 
 def test(X, large_regressor, y_pred, y_test_actual):
+    """ Test the model performance on the test set and visualize results."""
 
     mse = mean_squared_error(y_test_actual, y_pred)
     r2 = r2_score(y_test_actual, y_pred)
@@ -42,8 +43,3 @@ def test(X, large_regressor, y_pred, y_test_actual):
     plt.xlabel('Feature Importance')
     plt.ylabel('Features')
     plt.show()
-
-    # # === Export models/data for next file ===
-    # import joblib
-    # joblib.dump((X_test, y_pred_log, small_idx_test, y_reg_test, y_class_pred,
-    #             small_regressor, large_regressor, scaler), 'model_outputs.pkl')

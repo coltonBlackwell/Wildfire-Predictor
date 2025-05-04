@@ -6,11 +6,11 @@ import json
 
 
 def create_html_map():
-    # Load saved models and data
+    """Create an HTML map with predicted and actual fire sizes."""
+
     (X_test, y_pred_log, small_idx_test, y_reg_test,
     y_class_pred, small_regressor, large_regressor, scaler) = joblib.load('model_outputs.pkl')
 
-    # === Single Prediction Example ===
     sample = X_test.iloc[0:1]
     sample_pred_log = small_regressor.predict(sample)
     sample_pred = np.expm1(sample_pred_log)
@@ -24,13 +24,11 @@ def create_html_map():
     print(f"Actual log(SIZE_HA): {actual_log:.4f}")
     print(f"Actual SIZE_HA: {actual:.2f}")
 
-    # === Generate Folium Map ===
     sample_count = 1000
     sample_idxs = random.sample(range(len(X_test)), sample_count)
 
     m = Map(location=[53.5, -125], zoom_start=5.8, tiles='Esri.WorldImagery')
 
-    # Feature groups
     predicted_layer = FeatureGroup(name="Predicted Radius")
     actual_layer = FeatureGroup(name="Actual Radius")
 
@@ -60,35 +58,28 @@ def create_html_map():
 
         Marker([lat, lon], popup=Popup(data_info, max_width=400)).add_to(m)
 
-        # Add predicted radius (always visible)
         Circle([lat, lon], radius=pred_radius_m, color='red', fill=True,
             fill_opacity=0.3, popup=f'Predicted: {pred_ha:.1f} ha').add_to(predicted_layer)
 
-        # Add actual radius to toggle group
         Circle([lat, lon], radius=actual_radius_m, color='blue', fill=True,
             fill_opacity=0.3, popup=f'Actual: {actual_ha:.1f} ha').add_to(actual_layer)
 
-    # Load GeoJSON data
-    with open("georef-canada-province@public.geojson", "r", encoding="utf-8") as f:
+    with open("../../json/georef-canada-province@public.geojson", "r", encoding="utf-8") as f:
         geojson_data = json.load(f)
 
-    # Add GeoJson layer with all fields
     GeoJson(
         geojson_data,
         name="Provinces",
         style_function=lambda feature: {
-            'fillColor': '#00000000',  # transparent
-            'color': 'yellow',         # change for visibility
+            'fillColor': '#00000000', 
+            'color': 'yellow',      
             'weight': 2,
         }
     ).add_to(m)
 
-    # Add feature groups to map
     predicted_layer.add_to(m)
     actual_layer.add_to(m)
 
-    # Add LayerControl (to toggle layers)
     LayerControl().add_to(m)
 
-    # Save map
     m.save('index.html')
