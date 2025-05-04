@@ -2,3 +2,8 @@ pandas
 geopandas
 shapely
 numpy
+matplotlib
+seaborn
+scikit-learn
+xgboost
+folium
