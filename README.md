@@ -2,7 +2,7 @@
 
 Wildfire Predictor is a Python project designed to analyze wildfire data in British Columbia, preprocess inputs, train predictive models, and visualize wildfire occurrences. This README covers the essential information you need to get started with the project.
 
-![3d_vis](images/locations_of_greatest_fires_2.png)
+![3d_vis](images/locations_of_greatest_fires.png)
 
 ## Installation
 
