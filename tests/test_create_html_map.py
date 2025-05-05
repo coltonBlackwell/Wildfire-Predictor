@@ -14,7 +14,6 @@ from wildfire_predictor.utils.map import create_html_map
 
 @pytest.fixture
 def mock_dependencies(tmp_path):
-    # Mock model outputs
     X_test = pd.DataFrame({
         'LATITUDE': [0.5] * 1000,
         'LONGITUDE': [0.5] * 1000,
@@ -43,7 +42,6 @@ def mock_dependencies(tmp_path):
     mock_pkl_data = (X_test, y_pred_log, small_idx_test, y_reg_test,
                      y_class_pred, mock_model, mock_model, scaler)
 
-    # Create dummy GeoJSON
     geojson_path = tmp_path / "georef-canada-province@public.geojson"
     geojson_data = {
         "type": "FeatureCollection",
@@ -62,11 +60,9 @@ def test_create_html_map(mock_json_load, mock_open_func, mock_joblib_load, mock_
     mock_joblib_load.return_value = mock_pkl_data
     mock_json_load.return_value = {"type": "FeatureCollection", "features": []}
 
-    # Change cwd to tmp_path so 'index.html' is saved there
     with patch("folium.Map.save") as mock_save:
         with patch("builtins.open", mock_open(read_data=json.dumps(mock_json_load.return_value))):
             os.chdir(tmp_path)
             create_html_map()
 
-            # Check that the map save was called
             mock_save.assert_called_once()
