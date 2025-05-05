@@ -51,4 +51,8 @@ or test modules specifically using:
 
 This project is licensed under the terms of the [LICENSE](https://github.com/coltonBlackwell/Wildfire-Predictor/blob/main/LICENSE) file.
 
+## Learn More
+
+▶️ Check it out on [Youtube](https://www.youtube.com/watch?v=yd_FXZ6rbYc)! \
+🧑‍💻 Read more about it on my [website](https://coltonblackwell.github.io/wildfire.html)!
 
