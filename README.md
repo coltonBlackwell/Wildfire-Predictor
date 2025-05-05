@@ -16,10 +16,16 @@ Wildfire Predictor is a Python project designed to analyze wildfire data in Brit
    source .venv/bin/activate  # On Windows, use ".venv\Scripts\activate"
    ```
    
-2. **Dependencies**
+3. **Dependencies**\
    Install the required packages:
    ```sh
    pip install -r requirements.txt
+   ```
+
+4. **Running Project**\
+   run the following under src/wildfire_predictor:
+   ```sh
+   python3 main.py
    ```
 ## Data
 
