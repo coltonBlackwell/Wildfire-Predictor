@@ -4,78 +4,59 @@ import joblib
 import random
 import json
 
-
 def create_html_map():
-    """Create an HTML map with predicted and actual fire sizes using single-regressor outputs."""
+    """Create an HTML map with predicted and actual wildfire sizes."""
 
-    # Matches what your new training code saves:
+    # Load model outputs (updated to include LAT_ORIG / LON_ORIG)
     # (X_test, y_pred_log, y_test_log, regressor, scaler)
     X_test, y_pred_log, y_test_log, regressor, scaler = joblib.load('model_outputs.pkl')
 
-    # For a quick sanity check on one row
+    # Quick sanity check
     sample = X_test.iloc[0:1]
     sample_pred_log = regressor.predict(sample)
     sample_pred = np.expm1(sample_pred_log)[0]
     sample_actual = np.expm1(y_test_log.iloc[0])
+    print(f"Sample Prediction: {sample_pred:.2f} ha, Actual: {sample_actual:.2f} ha")
 
-    print("\n--- Single Prediction Example ---")
-    print(f"Predicted log(SIZE_HA): {sample_pred_log[0]:.4f}")
-    print(f"Predicted SIZE_HA: {sample_pred:.2f}")
-    print(f"Actual log(SIZE_HA): {y_test_log.iloc[0]:.4f}")
-    print(f"Actual SIZE_HA: {sample_actual:.2f}")
-
-    # Sample up to 1000 points safely
+    # Limit points for plotting
     sample_count = min(1000, len(X_test))
     sample_idxs = random.sample(range(len(X_test)), sample_count)
 
+    # Base map
     m = Map(location=[53.5, -125], zoom_start=5.8, tiles='Esri.WorldImagery')
-
     predicted_layer = FeatureGroup(name="Predicted Radius")
     actual_layer = FeatureGroup(name="Actual Radius")
 
+    # Conversion from hectares to radius in meters
+    def ha_to_radius_m(ha: float) -> float:
+        ha = max(ha, 0.0)
+        return float(np.sqrt(ha * 10000.0 / np.pi))
+
     for idx in sample_idxs:
-        row = X_test.iloc[idx]   # Series
-        pred_log = y_pred_log[idx]
-        pred_ha = float(np.expm1(pred_log))
+        row = X_test.iloc[idx]
+
+        # Use original LAT/LON for plotting
+        lat = row.get('LAT_ORIG', row.get('LATITUDE'))
+        lon = row.get('LON_ORIG', row.get('LONGITUDE'))
+
+        pred_ha = float(np.expm1(y_pred_log[idx]))
         actual_ha = float(np.expm1(y_test_log.iloc[idx]))
-
-        # Invert StandardScaler for lat/lon (x_original = x_scaled * scale + mean)
-        lat = row['LATITUDE'] * scaler.scale_[0] + scaler.mean_[0]
-        lon = row['LONGITUDE'] * scaler.scale_[1] + scaler.mean_[1]
-
-        # Correct circle radius from hectares:
-        # 1 ha = 10,000 m^2; radius = sqrt(area / pi) = sqrt(ha * 10000 / pi)
-        def ha_to_radius_m(ha: float) -> float:
-            ha = max(ha, 0.0)
-            return float(np.sqrt(ha * 10000.0 / np.pi))
 
         pred_radius_m = ha_to_radius_m(pred_ha)
         actual_radius_m = ha_to_radius_m(actual_ha)
 
-        # Safely fetch one-hot/binary features (default to 0 if missing)
-        def safe(row_, key):
-            try:
-                return int(row_.get(key, 0))
-            except Exception:
-                return 0
-
+        # Popup info
         data_info = f"""
-        <b>Cause (Human):</b> {safe(row, 'CAUSE_H')}<br>
-        <b>Cause (Lightning):</b> {safe(row, 'CAUSE_L')}<br>
-        <b>Cause (Unknown):</b> {safe(row, 'CAUSE_U')}<br>
-        <b>Boreal Cordillera:</b> {safe(row, 'ECOZ_Boreal Cordillera')}<br>
-        <b>Boreal Plain:</b> {safe(row, 'ECOZ_Boreal PLain')}<br>
-        <b>Montane Cordillera:</b> {safe(row, 'ECOZ_Montane Cordillera')}<br>
-        <b>Pacific Maritime:</b> {safe(row, 'ECOZ_Pacific Maritime')}<br>
-        <b>Prairie:</b> {safe(row, 'ECOZ_Prairie')}<br>
-        <b>Taiga Plain:</b> {safe(row, 'ECOZ_Taiga Plain')}<br>
+        <b>Predicted:</b> {pred_ha:.1f} ha<br>
+        <b>Actual:</b> {actual_ha:.1f} ha<br>
+        <b>Latitude:</b> {lat:.4f}<br>
+        <b>Longitude:</b> {lon:.4f}<br>
         """
 
+        # Add marker and circles
         Marker([lat, lon], popup=Popup(data_info, max_width=400)).add_to(m)
-
         Circle([lat, lon], radius=pred_radius_m, color='red', fill=True,
                fill_opacity=0.3, popup=f'Predicted: {pred_ha:.1f} ha').add_to(predicted_layer)
-
         Circle([lat, lon], radius=actual_radius_m, color='blue', fill=True,
                fill_opacity=0.3, popup=f'Actual: {actual_ha:.1f} ha').add_to(actual_layer)
 
@@ -98,3 +79,4 @@ def create_html_map():
     LayerControl().add_to(m)
 
     m.save('index.html')
+    print("Map saved to 'index.html'")

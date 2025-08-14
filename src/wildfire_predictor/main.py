@@ -11,8 +11,8 @@ def main():
     preprocess_wildfire_data(input_csv='../../data/CANADA_WILDFIRES.csv', output_csv='../../data/processed/wildfires_preprocessed.csv')
 
     #Visualizing
-    create_grid(input_csv='../../data/processed/wildfires_preprocessed.csv', output_csv='../../data/processed/fire_grid_counts.csv', grid_size_km=10)
-    visualize_fire_grid(input_csv='../../data/processed/fire_grid_counts.csv')
+    # create_grid(input_csv='../../data/processed/wildfires_preprocessed.csv', output_csv='../../data/processed/fire_grid_counts.csv', grid_size_km=10)
+    # visualize_fire_grid(input_csv='../../data/processed/fire_grid_counts.csv')
 
     #train model
     X, large_regressor, y_pred, y_test_actual = train(input_csv='../../data/processed/wildfires_preprocessed.csv')

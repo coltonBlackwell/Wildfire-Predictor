@@ -5,7 +5,7 @@ def preprocess_wildfire_data(input_csv, output_csv):
 
     df = pd.read_csv(input_csv)
 
-    df = df[df['SRC_AGENCY'] == 'BC'].copy()
+    # df = df[df['SRC_AGENCY'] == 'BC'].copy()
     df.drop(columns=['SRC_AGENCY'], inplace=True)
     df['REP_DATE'] = pd.to_datetime(df['REP_DATE'], errors='coerce')
     df = df.dropna(subset=['REP_DATE'])
