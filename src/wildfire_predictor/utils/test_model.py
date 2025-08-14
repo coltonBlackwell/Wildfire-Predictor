@@ -33,13 +33,13 @@ def test(X, large_regressor, y_pred, y_test_actual):
     plt.show()
 
     # --- Plot 3: Feature Importance ---
-    plt.figure(figsize=(10, 6))
-    xgb_importance = large_regressor.feature_importances_
-    feature_names = X.columns
+    # plt.figure(figsize=(10, 6))
+    # xgb_importance = large_regressor.feature_importances_
+    # feature_names = X.columns
 
-    sorted_idx = np.argsort(xgb_importance)[::-1]
-    plt.barh(feature_names[sorted_idx], xgb_importance[sorted_idx], color='lightcoral')
-    plt.title('Feature Importance from XGBoost (Large Fires Model)')
-    plt.xlabel('Feature Importance')
-    plt.ylabel('Features')
-    plt.show()
+    # sorted_idx = np.argsort(xgb_importance)[::-1]
+    # plt.barh(feature_names[sorted_idx], xgb_importance[sorted_idx], color='lightcoral')
+    # plt.title('Feature Importance from XGBoost (Large Fires Model)')
+    # plt.xlabel('Feature Importance')
+    # plt.ylabel('Features')
+    # plt.show()

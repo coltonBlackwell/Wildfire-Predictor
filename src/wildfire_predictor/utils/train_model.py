@@ -1,26 +1,30 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import HistGradientBoostingRegressor, HistGradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
-from xgboost import XGBRegressor
 import joblib
 
 
-
 def train(input_csv):
-    """Train a model to predict wildfire size and classify large wildfires."""
+    """Train a single well-regularized model to predict wildfire size (log-transformed)."""
 
+    # Load dataset
     df = pd.read_csv(input_csv)
 
-    df = df[df['SIZE_HA'] < df['SIZE_HA'].quantile(0.9)]
-    df['IS_LARGE'] = (df['SIZE_HA'] > 1).astype(int)
+    # Log-transform size to stabilize variance
     df['LOG_SIZE'] = np.log1p(df['SIZE_HA'])
 
+    # Create extra features
     df['LAT_LONG'] = df['LATITUDE'] * df['LONGITUDE']
-    df['SEASON'] = pd.cut(df['MONTH'], bins=[0, 3, 6, 9, 12], labels=['Winter', 'Spring', 'Summer', 'Fall'])
+    df['SEASON'] = pd.cut(
+        df['MONTH'],
+        bins=[0, 3, 6, 9, 12],
+        labels=['Winter', 'Spring', 'Summer', 'Fall']
+    )
     df = pd.get_dummies(df, columns=['SEASON'], drop_first=True)
 
+    # Feature selection
     feature_cols = [
         'LATITUDE', 'LONGITUDE', 'YEAR', 'MONTH', 'DAY', 'DAYOFYEAR', 'LAT_LONG',
         'CAUSE_H', 'CAUSE_L', 'CAUSE_U',
@@ -29,44 +33,39 @@ def train(input_csv):
         'SEASON_Spring', 'SEASON_Summer', 'SEASON_Fall'
     ]
     X = df[feature_cols].copy()
-    y_class = df['IS_LARGE']
     y_reg = df['LOG_SIZE']
 
+    # Scale numeric features
     numeric_cols = ['LATITUDE', 'LONGITUDE', 'YEAR', 'MONTH', 'DAY', 'DAYOFYEAR', 'LAT_LONG']
     scaler = StandardScaler()
     X[numeric_cols] = scaler.fit_transform(X[numeric_cols])
 
-    X_train, X_test, y_class_train, y_class_test, y_reg_train, y_reg_test = train_test_split(
-        X, y_class, y_reg, test_size=0.2, random_state=42
+    # Train-test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y_reg, test_size=0.2, random_state=42
     )
 
-    classifier = HistGradientBoostingClassifier(random_state=42)
-    classifier.fit(X_train, y_class_train)
-
-    small_idx_train = y_class_train == 0
-    large_idx_train = y_class_train == 1
-
-    small_regressor = HistGradientBoostingRegressor(random_state=42)
-    large_regressor = XGBRegressor(
-        n_estimators=300, learning_rate=0.05, max_depth=10,
-        subsample=0.8, colsample_bytree=0.8, random_state=42, verbosity=0
+    # Single well-regularized regressor
+    regressor = HistGradientBoostingRegressor(
+        max_depth=6,
+        learning_rate=0.05,
+        max_iter=500,
+        l2_regularization=0.1,
+        random_state=42
     )
+    regressor.fit(X_train, y_train)
 
-    small_regressor.fit(X_train[small_idx_train], y_reg_train[small_idx_train])
-    large_regressor.fit(X_train[large_idx_train], y_reg_train[large_idx_train])
+    # Predictions in log space
+    y_pred_log = regressor.predict(X_test)
 
-    y_class_pred = classifier.predict(X_test)
-
-    y_pred_log = np.zeros_like(y_reg_test)
-    small_idx_test = y_class_pred == 0
-    large_idx_test = y_class_pred == 1
-    y_pred_log[small_idx_test] = small_regressor.predict(X_test[small_idx_test])
-    y_pred_log[large_idx_test] = large_regressor.predict(X_test[large_idx_test])
-
+    # Convert back to hectares
     y_pred = np.expm1(y_pred_log)
-    y_test_actual = np.expm1(y_reg_test)
+    y_test_actual = np.expm1(y_test)
 
-    joblib.dump((X_test, y_pred_log, small_idx_test, y_reg_test, y_class_pred,
-                small_regressor, large_regressor, scaler), 'model_outputs.pkl')
+    # Save model artifacts
+    joblib.dump(
+        (X_test, y_pred_log, y_test, regressor, scaler),
+        'model_outputs.pkl'
+    )
 
-    return X, large_regressor, y_pred, y_test_actual
+    return X, regressor, y_pred, y_test_actual
